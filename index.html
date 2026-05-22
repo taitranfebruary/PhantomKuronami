@@ -292,6 +292,28 @@
     clearBtn.addEventListener('click', () => { files = []; renderFiles(); resultSection.classList.add('hidden'); });
 
     // ================================================================
+    // SAVE WITH FILE PICKER (chọn nơi lưu)
+    // ================================================================
+    async function saveWithPicker(blob, fileName, fileTypes) {
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: fileName,
+                    types: fileTypes
+                });
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                return;
+            } catch (e) {
+                if (e.name === 'AbortError') return; // user cancelled
+            }
+        }
+        // Fallback cho Firefox/Safari
+        saveAs(blob, fileName);
+    }
+
+    // ================================================================
     // PROCESS
     // ================================================================
     processBtn.addEventListener('click', run);
@@ -369,15 +391,15 @@
         ).join('');
         resultSection.classList.remove('hidden');
 
-        // Download
+        // Download — cho chọn nơi lưu (Chrome/Edge), fallback tải thẳng (Firefox/Safari)
         if (outputs.length === 1) {
             const blob = new Blob([outputs[0].buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            saveAs(blob, outputs[0].name);
+            await saveWithPicker(blob, outputs[0].name, [{ description: 'Excel', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }]);
         } else if (outputs.length > 1) {
             const zip = new JSZip();
             outputs.forEach(o => zip.file(o.name, o.buffer));
             const zipBlob = await zip.generateAsync({ type: 'blob' });
-            saveAs(zipBlob, 'excel_output.zip');
+            await saveWithPicker(zipBlob, 'excel_output.zip', [{ description: 'ZIP', accept: { 'application/zip': ['.zip'] } }]);
         }
 
         // Reset button
