@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Auto Formula — OQC Tool</title>
+    <meta name="description" content="Áp công thức kiểm tra chất lượng OQC hàng loạt cho file Excel. Xử lý trên trình duyệt, không upload server.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .drop-zone { transition: all 0.2s ease; }
+        .drop-zone.dragover { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 4px rgba(37,99,235,0.1); }
+        .fade-up { animation: fadeUp 0.4s ease-out; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50">
+
+    <!-- Nav -->
+    <nav class="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+        <div class="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">📊</span>
+                <span class="font-bold text-slate-800">Excel Auto Formula</span>
+            </div>
+            <a href="https://github.com" target="_blank" class="text-xs text-slate-400 hover:text-slate-600 transition">v1.0</a>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto px-4 py-10">
+
+        <!-- Hero -->
+        <section class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-slate-900 mb-3">Áp công thức OQC hàng loạt</h1>
+            <p class="text-slate-500 text-lg max-w-xl mx-auto">
+                Bỏ file Excel vào — nhận kết quả ngay. Tự tính <strong>F10</strong>, <strong>I11</strong>, <strong>M11</strong> dựa trên ô <strong>O5</strong>.
+            </p>
+            <p class="mt-2 text-xs text-slate-400 flex items-center justify-center gap-1">
+                <span class="inline-block w-2 h-2 bg-green-400 rounded-full pulse-dot"></span>
+                Xử lý 100% trên trình duyệt — không upload file lên đâu cả
+            </p>
+        </section>
+
+        <!-- Upload -->
+        <section class="mb-8">
+            <div id="dropZone" class="drop-zone border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center cursor-pointer bg-white hover:border-blue-300 hover:bg-blue-50/30">
+                <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/>
+                </svg>
+                <p class="font-medium text-slate-600">Kéo thả file .xlsx vào đây</p>
+                <p class="text-sm text-slate-400 mt-1">hoặc <span class="text-blue-500 underline">click để chọn</span></p>
+                <input type="file" id="fileInput" multiple accept=".xlsx" class="hidden">
+            </div>
+        </section>
+
+        <!-- File List -->
+        <section id="fileSection" class="hidden mb-8 fade-up">
+            <div class="bg-white border rounded-xl overflow-hidden shadow-sm">
+                <div class="flex items-center justify-between px-5 py-3 border-b bg-slate-50">
+                    <h2 class="font-semibold text-slate-700 text-sm" id="fileCount">0 file</h2>
+                    <button id="clearBtn" class="text-xs text-red-500 hover:text-red-700 font-medium">Xóa hết</button>
+                </div>
+                <div id="fileItems" class="divide-y max-h-60 overflow-y-auto"></div>
+                <div class="px-5 py-4 border-t bg-slate-50">
+                    <button id="processBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 rounded-xl shadow transition-all">
+                        ⚡ Áp công thức & Tải về
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Progress -->
+        <section id="progressSection" class="hidden mb-8 fade-up">
+            <div class="bg-white border rounded-xl p-5 shadow-sm">
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="text-slate-600 font-medium">Đang xử lý...</span>
+                    <span id="progressLabel" class="text-blue-600 font-semibold">0/0</span>
+                </div>
+                <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div id="progressBar" class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width:0%"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results -->
+        <section id="resultSection" class="hidden mb-8 fade-up">
+            <div class="bg-white border rounded-xl overflow-hidden shadow-sm">
+                <div class="px-5 py-3 border-b bg-green-50 flex items-center gap-2">
+                    <span class="text-green-600 font-semibold text-sm">✅ Hoàn tất</span>
+                    <span id="resultSummary" class="text-xs text-green-500"></span>
+                </div>
+                <div id="resultItems" class="divide-y max-h-80 overflow-y-auto"></div>
+            </div>
+        </section>
+
+        <!-- Info -->
+        <section class="mb-10">
+            <details class="bg-white border rounded-xl shadow-sm group">
+                <summary class="px-5 py-4 cursor-pointer font-semibold text-slate-700 text-sm select-none flex items-center justify-between">
+                    📋 Bảng tra công thức (AQL Sampling)
+                    <svg class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </summary>
+                <div class="px-5 pb-5 space-y-5 text-sm">
+                    <div>
+                        <h3 class="font-semibold text-red-600 mb-2">🔴 F10 — Sample Size (dựa vào O5)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead><tr class="bg-slate-50"><th class="border border-slate-200 px-3 py-2">O5 (Lot Size)</th><th class="border border-slate-200 px-3 py-2">F10 (Sample)</th></tr></thead>
+                                <tbody>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">1 – 25</td><td class="border border-slate-200 px-3 py-1.5 font-medium">全檢</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">26 – 280</td><td class="border border-slate-200 px-3 py-1.5">20</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">281 – 1,200</td><td class="border border-slate-200 px-3 py-1.5">80</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">1,201 – 3,200</td><td class="border border-slate-200 px-3 py-1.5">125</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">3,201 – 10,000</td><td class="border border-slate-200 px-3 py-1.5">200</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">10,001 – 35,000</td><td class="border border-slate-200 px-3 py-1.5">315</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-cyan-600 mb-2">🔵 I11 — Ac/Re Major (dựa vào F10)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead><tr class="bg-slate-50"><th class="border border-slate-200 px-3 py-2">F10</th><th class="border border-slate-200 px-3 py-2">I11</th></tr></thead>
+                                <tbody>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">全檢 / 20</td><td class="border border-slate-200 px-3 py-1.5">0/1</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">80</td><td class="border border-slate-200 px-3 py-1.5">1/2</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">125</td><td class="border border-slate-200 px-3 py-1.5">2/3</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">200</td><td class="border border-slate-200 px-3 py-1.5">3/4</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">315</td><td class="border border-slate-200 px-3 py-1.5">5/6</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-slate-800 mb-2">⚫ M11 — Ac/Re Minor (dựa vào O5)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead><tr class="bg-slate-50"><th class="border border-slate-200 px-3 py-2">O5</th><th class="border border-slate-200 px-3 py-2">M11</th></tr></thead>
+                                <tbody>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">1 – 50</td><td class="border border-slate-200 px-3 py-1.5">0/1</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">51 – 150</td><td class="border border-slate-200 px-3 py-1.5">1/2</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">151 – 280</td><td class="border border-slate-200 px-3 py-1.5">2/3</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">281 – 500</td><td class="border border-slate-200 px-3 py-1.5">3/4</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">501 – 1,200</td><td class="border border-slate-200 px-3 py-1.5">5/6</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">1,201 – 3,200</td><td class="border border-slate-200 px-3 py-1.5">7/8</td></tr>
+                                    <tr><td class="border border-slate-200 px-3 py-1.5">3,201 – 10,000</td><td class="border border-slate-200 px-3 py-1.5">10/11</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </section>
+
+        <!-- How to use -->
+        <section class="text-center text-sm text-slate-400 space-y-1">
+            <p><strong class="text-slate-500">Cách dùng:</strong> Bỏ file Excel có ô O5 chứa số lượng lô → nhấn nút → tải file kết quả.</p>
+            <p>File cần có sheet tên "SHEET 1" (hoặc "sheet 1"). Format gốc được giữ nguyên.</p>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t mt-16 py-6 text-center text-xs text-slate-400">
+        Made for OQC teams — Open Source
+    </footer>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+    <script>
+    // ================================================================
+    // FORMULA LOGIC
+    // ================================================================
+    function calcF10(o5) {
+        if (o5 == null || o5 === '') return null;
+        const n = Number(o5);
+        if (isNaN(n)) return null;
+        if (n >= 1 && n <= 25) return '全檢';
+        if (n >= 26 && n <= 280) return 20;
+        if (n >= 281 && n <= 1200) return 80;
+        if (n >= 1201 && n <= 3200) return 125;
+        if (n >= 3201 && n <= 10000) return 200;
+        if (n >= 10001 && n <= 35000) return 315;
+        return null;
+    }
+
+    function calcI11(f10) {
+        if (f10 == null) return null;
+        if (f10 === '全檢' || f10 === 20) return '0/1';
+        if (f10 === 80) return '1/2';
+        if (f10 === 125) return '2/3';
+        if (f10 === 200) return '3/4';
+        if (f10 === 315) return '5/6';
+        return null;
+    }
+
+    function calcM11(o5) {
+        if (o5 == null || o5 === '') return null;
+        const n = Number(o5);
+        if (isNaN(n)) return null;
+        if (n >= 1 && n <= 50) return '0/1';
+        if (n >= 51 && n <= 150) return '1/2';
+        if (n >= 151 && n <= 280) return '2/3';
+        if (n >= 281 && n <= 500) return '3/4';
+        if (n >= 501 && n <= 1200) return '5/6';
+        if (n >= 1201 && n <= 3200) return '7/8';
+        if (n >= 3201 && n <= 10000) return '10/11';
+        return null;
+    }
+
+    // ================================================================
+    // UI ELEMENTS
+    // ================================================================
+    const $ = (s) => document.querySelector(s);
+    const dropZone = $('#dropZone');
+    const fileInput = $('#fileInput');
+    const fileSection = $('#fileSection');
+    const fileItems = $('#fileItems');
+    const fileCount = $('#fileCount');
+    const clearBtn = $('#clearBtn');
+    const processBtn = $('#processBtn');
+    const progressSection = $('#progressSection');
+    const progressBar = $('#progressBar');
+    const progressLabel = $('#progressLabel');
+    const resultSection = $('#resultSection');
+    const resultItems = $('#resultItems');
+    const resultSummary = $('#resultSummary');
+
+    let files = [];
+
+    // ================================================================
+    // FILE INPUT
+    // ================================================================
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        addFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', e => { addFiles(e.target.files); fileInput.value = ''; });
+
+    function addFiles(newFiles) {
+        const valid = Array.from(newFiles).filter(f => f.name.toLowerCase().endsWith('.xlsx'));
+        if (!valid.length) return alert('Chỉ hỗ trợ file .xlsx');
+        files = [...files, ...valid];
+        renderFiles();
+    }
+
+    function renderFiles() {
+        if (!files.length) { fileSection.classList.add('hidden'); return; }
+        fileSection.classList.remove('hidden');
+        fileCount.textContent = `${files.length} file`;
+        fileItems.innerHTML = files.map((f, i) => `
+            <div class="flex items-center justify-between px-5 py-2.5 hover:bg-slate-50">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-green-500 text-base">📄</span>
+                    <span class="text-sm text-slate-700 truncate">${f.name}</span>
+                    <span class="text-xs text-slate-400 shrink-0">${(f.size/1024).toFixed(0)} KB</span>
+                </div>
+                <button onclick="removeFile(${i})" class="text-slate-300 hover:text-red-500 transition text-lg leading-none">&times;</button>
+            </div>
+        `).join('');
+    }
+
+    function removeFile(i) { files.splice(i, 1); renderFiles(); }
+    clearBtn.addEventListener('click', () => { files = []; renderFiles(); resultSection.classList.add('hidden'); });
+
+    // ================================================================
+    // PROCESS
+    // ================================================================
+    processBtn.addEventListener('click', run);
+
+    async function run() {
+        if (!files.length) return;
+
+        // UI state
+        processBtn.disabled = true;
+        processBtn.innerHTML = '⏳ Đang xử lý...';
+        progressSection.classList.remove('hidden');
+        resultSection.classList.add('hidden');
+
+        const outputs = [];
+        const results = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const pct = Math.round(((i + 1) / files.length) * 100);
+            progressBar.style.width = pct + '%';
+            progressLabel.textContent = `${i + 1} / ${files.length}`;
+
+            const file = files[i];
+            try {
+                const buf = await file.arrayBuffer();
+                const wb = new ExcelJS.Workbook();
+                await wb.xlsx.load(buf);
+
+                // Find sheet "sheet 1" (case-insensitive)
+                let ws = null;
+                wb.eachSheet(sheet => {
+                    if (!ws && sheet.name.trim().toLowerCase() === 'sheet 1') ws = sheet;
+                });
+                if (!ws) ws = wb.worksheets[0];
+
+                // Read O5
+                const o5Raw = ws.getCell('O5').value;
+                // Handle ExcelJS rich value objects
+                const o5 = (o5Raw && typeof o5Raw === 'object' && 'result' in o5Raw) ? o5Raw.result : o5Raw;
+
+                // Compute
+                const f10 = calcF10(o5);
+                const i11 = calcI11(f10);
+                const m11 = calcM11(o5);
+
+                // Write
+                ws.getCell('F10').value = f10;
+                ws.getCell('I11').value = i11;
+                ws.getCell('M11').value = m11;
+
+                const outBuf = await wb.xlsx.writeBuffer();
+                outputs.push({ name: file.name, buffer: outBuf });
+                results.push({ name: file.name, o5, f10, i11, m11, ok: true });
+            } catch (err) {
+                results.push({ name: file.name, error: err.message, ok: false });
+            }
+        }
+
+        // Show results
+        const okCount = results.filter(r => r.ok).length;
+        resultSummary.textContent = `— ${okCount}/${results.length} file thành công`;
+        resultItems.innerHTML = results.map(r => r.ok
+            ? `<div class="px-5 py-3 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-slate-700 truncate">${r.name}</p>
+                        <p class="text-xs text-slate-400 mt-0.5">O5=${r.o5} → F10=<span class="text-red-500 font-medium">${r.f10}</span> · I11=<span class="text-cyan-600 font-medium">${r.i11}</span> · M11=<span class="font-medium">${r.m11}</span></p>
+                    </div>
+                    <span class="text-green-500 shrink-0">✓</span>
+                </div>`
+            : `<div class="px-5 py-3 flex items-center justify-between gap-2 bg-red-50">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-red-700 truncate">${r.name}</p>
+                        <p class="text-xs text-red-400 mt-0.5">${r.error}</p>
+                    </div>
+                    <span class="text-red-400 shrink-0">✕</span>
+                </div>`
+        ).join('');
+        resultSection.classList.remove('hidden');
+
+        // Download
+        if (outputs.length === 1) {
+            const blob = new Blob([outputs[0].buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            saveAs(blob, outputs[0].name);
+        } else if (outputs.length > 1) {
+            const zip = new JSZip();
+            outputs.forEach(o => zip.file(o.name, o.buffer));
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            saveAs(zipBlob, 'excel_output.zip');
+        }
+
+        // Reset button
+        processBtn.disabled = false;
+        processBtn.innerHTML = '⚡ Áp công thức & Tải về';
+        progressSection.classList.add('hidden');
+    }
+    </script>
+</body>
+</html>
