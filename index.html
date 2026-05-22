@@ -186,7 +186,14 @@
 
     <script>
     // ================================================================
-    // FORMULA LOGIC
+    // EXCEL FORMULAS (ghi vào ô để tự động tính khi sửa O5)
+    // ================================================================
+    const FORMULA_F10 = 'IF(AND(O5>=1,O5<=25),"全檢",IF(AND(O5>=26,O5<=280),20,IF(AND(O5>=281,O5<=1200),80,IF(AND(O5>=1201,O5<=3200),125,IF(AND(O5>=3201,O5<=10000),200,IF(AND(O5>=10001,O5<=35000),315))))))';
+    const FORMULA_I11 = 'IF(OR(F10="全檢",F10=20),"0/1",IF(F10=80,"1/2",IF(F10=125,"2/3",IF(F10=200,"3/4",IF(F10=315,"5/6")))))';
+    const FORMULA_M11 = 'IF(AND(O5>=1,O5<=50),"0/1",IF(AND(O5>=51,O5<=150),"1/2",IF(AND(O5>=151,O5<=280),"2/3",IF(AND(O5>=281,O5<=500),"3/4",IF(AND(O5>=501,O5<=1200),"5/6",IF(AND(O5>=1201,O5<=3200),"7/8",IF(AND(O5>=3201,O5<=10000),"10/11")))))))';
+
+    // ================================================================
+    // PYTHON-STYLE CALC (chỉ để hiển thị kỳ vọng, không ghi vào file)
     // ================================================================
     function calcF10(o5) {
         if (o5 == null || o5 === '') return null;
@@ -319,20 +326,19 @@
                 });
                 if (!ws) ws = wb.worksheets[0];
 
-                // Read O5
+                // Read O5 (để hiển thị kỳ vọng)
                 const o5Raw = ws.getCell('O5').value;
-                // Handle ExcelJS rich value objects
                 const o5 = (o5Raw && typeof o5Raw === 'object' && 'result' in o5Raw) ? o5Raw.result : o5Raw;
 
-                // Compute
+                // Tính kỳ vọng (chỉ để hiển thị, không ghi vào file)
                 const f10 = calcF10(o5);
                 const i11 = calcI11(f10);
                 const m11 = calcM11(o5);
 
-                // Write
-                ws.getCell('F10').value = f10;
-                ws.getCell('I11').value = i11;
-                ws.getCell('M11').value = m11;
+                // GHI CÔNG THỨC EXCEL vào ô (tự động tính khi mở/sửa O5)
+                ws.getCell('F10').value = { formula: FORMULA_F10 };
+                ws.getCell('I11').value = { formula: FORMULA_I11 };
+                ws.getCell('M11').value = { formula: FORMULA_M11 };
 
                 const outBuf = await wb.xlsx.writeBuffer();
                 outputs.push({ name: file.name, buffer: outBuf });
@@ -349,7 +355,7 @@
             ? `<div class="px-5 py-3 flex items-center justify-between gap-2">
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-slate-700 truncate">${r.name}</p>
-                        <p class="text-xs text-slate-400 mt-0.5">O5=${r.o5} → F10=<span class="text-red-500 font-medium">${r.f10}</span> · I11=<span class="text-cyan-600 font-medium">${r.i11}</span> · M11=<span class="font-medium">${r.m11}</span></p>
+                        <p class="text-xs text-slate-400 mt-0.5">📝 Đã ghi công thức · O5=${r.o5} → kỳ vọng: <span class="text-red-500 font-medium">${r.f10}</span> · <span class="text-cyan-600 font-medium">${r.i11}</span> · <span class="font-medium">${r.m11}</span></p>
                     </div>
                     <span class="text-green-500 shrink-0">✓</span>
                 </div>`
